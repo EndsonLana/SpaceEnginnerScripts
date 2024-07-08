@@ -1,0 +1,201 @@
+/// Whip's Rotor Angle Increment Code v3 /// revision: 3/17/17
+/*
+Setup:
+1) Place this code in a program block
+2) Make a timer with actions:
+    - Run this program with NO ARGUMENT
+    - Start itself
+    - Trigger Now itself
+3) Name the rotors that you wish to increment with the name tag "Increment" (you can custmize this below)
+ 
+Arguments:
+ 
+<angle> : typing a number will INCREMENT the rotor angle by that number
+    Ex: "+10" will increment by 10 degrees
+    Ex: "-30" will increment by -30 degrees
+ 
+set <angle> : typing the word "set" in front of the angle will make the code EXPLICITLY set the rotor angle to the
+              input number.
+    Ex: "set 130" will set the rotor angle to 130 degrees
+ 
+*/
+ 
+const string rotorName = "Increment";
+const float rotationVelocity = 3f;
+bool lockRotorsOnLimit = true;
+ 
+////NO TOUCHEY BELOW HERE///
+const double updatesPerSecond = 10;
+const double maxCycleTime = 1 / updatesPerSecond;
+double currentCycleTime = 0;
+ 
+void Main(string arg)
+{
+    if (arg != "")
+    {
+        ParseArguments(arg);
+    }
+    
+    currentCycleTime += Runtime.TimeSinceLastRun.TotalSeconds;
+    
+    if (currentCycleTime < maxCycleTime)
+        return;
+    
+    if (lockRotorsOnLimit)
+    {
+       CheckRotorLock();
+    }
+    
+    currentCycleTime = 0;
+}
+ 
+void ParseArguments(string argument)
+{
+    string command = "";
+    bool setRotorAngle = false;
+    if (argument.ToLower().Contains("set "))
+    {
+        command = argument.ToLower().Replace("set ", "");
+        setRotorAngle = true;
+    }
+    else if (argument.Contains("+"))
+    {
+        command = argument.Replace("+", "");
+    }
+    else
+    {
+        command = argument;
+    }
+    
+    float value;
+    bool isNumeric = Single.TryParse(command, out value);
+    if (isNumeric)
+    {
+        if (setRotorAngle)
+        {
+            Echo("Argument parsed as: " + value.ToString());
+            Echo("Setting rotor angle...");
+            SetRotorAngles(value);
+        }
+        else
+        {
+            Echo("Argument parsed as: " + value.ToString());
+            Echo("Incrementing rotors...");
+            IncrementRotor(value);
+        }
+       
+    }
+    else if (command.ToLower() == "round")
+    {
+        Echo("Argument parsed as: " + command);
+        Echo("Rounding off rotor angles...");
+        RoundRotorAngles();
+    }
+    else
+    {
+        Echo("Error: Argument '" + argument + "' could not be parsed");
+    }
+}
+ 
+void CheckRotorLock()
+{
+    var rotors = new List<IMyTerminalBlock>();
+    GridTerminalSystem.SearchBlocksOfName(rotorName, rotors, IsRotor);
+    foreach (IMyMotorStator thisRotor in rotors)
+    {
+        if (Math.Abs(thisRotor.Angle - thisRotor.UpperLimit) < 0.01f || Math.Abs(thisRotor.Angle - thisRotor.LowerLimit) < 0.01f)
+        {
+            thisRotor.SetValue("Force weld", true);
+        }
+        else
+        {
+            thisRotor.SetValue("Force weld", false);
+        }
+    }
+}
+ 
+void IncrementRotor(float increment)
+{
+    var rotors = new List<IMyTerminalBlock>();
+    GridTerminalSystem.SearchBlocksOfName(rotorName, rotors, IsRotor);
+    foreach (IMyMotorStator thisRotor in rotors)
+    {
+        float currentAngle = thisRotor.Angle / (float)Math.PI * 180f;
+        float newAngle = currentAngle + increment;
+        
+        Echo("Current Angle: " + currentAngle.ToString());
+        Echo("New Angle: " + newAngle.ToString());
+ 
+        if (newAngle > currentAngle)
+        {
+            thisRotor.SetValue<float>("UpperLimit", newAngle);
+            thisRotor.SetValue<float>("LowerLimit", -361f);
+            thisRotor.SetValue<float>("Velocity", rotationVelocity);
+        }
+        else
+        {
+            thisRotor.SetValue<float>("LowerLimit", newAngle);
+            thisRotor.SetValue<float>("UpperLimit", 361f);
+            thisRotor.SetValue<float>("Velocity", -rotationVelocity);
+        }
+    }
+}
+ 
+void RoundRotorAngles()
+{
+    var rotors = new List<IMyTerminalBlock>();
+    GridTerminalSystem.SearchBlocksOfName(rotorName, rotors, IsRotor);
+    foreach (IMyMotorStator thisRotor in rotors)
+    {
+        float currentAngle = thisRotor.Angle / (float)Math.PI * 180f;
+        float newAngle = (float)Math.Round(currentAngle);
+        
+        Echo("Current Angle: " + currentAngle.ToString());
+        Echo("New Angle: " + newAngle.ToString());
+ 
+        if (newAngle > currentAngle)
+        {
+            thisRotor.SetValue<float>("UpperLimit", newAngle);
+            thisRotor.SetValue<float>("LowerLimit", -361f);
+            thisRotor.SetValue<float>("Velocity", rotationVelocity);
+        }
+        else
+        {
+            thisRotor.SetValue<float>("LowerLimit", newAngle);
+            thisRotor.SetValue<float>("UpperLimit", 361f);
+            thisRotor.SetValue<float>("Velocity", -rotationVelocity);
+        }
+    }
+}
+ 
+void SetRotorAngles(float angle)
+{
+    var rotors = new List<IMyTerminalBlock>();
+    GridTerminalSystem.SearchBlocksOfName(rotorName, rotors, IsRotor);
+    foreach (IMyMotorStator thisRotor in rotors)
+    {
+        float currentAngle = thisRotor.Angle / (float)Math.PI * 180f;
+        
+        Echo("Current Angle: " + currentAngle.ToString());
+        Echo("New Angle: " + angle.ToString());
+ 
+        if (angle > currentAngle)
+        {
+            thisRotor.SetValue<float>("UpperLimit", angle);
+            thisRotor.SetValue<float>("LowerLimit", -361f);
+            thisRotor.SetValue<float>("Velocity", rotationVelocity);
+        }
+        else
+        {
+            thisRotor.SetValue<float>("LowerLimit", angle);
+            thisRotor.SetValue<float>("UpperLimit", 361f);
+            thisRotor.SetValue<float>("Velocity", -rotationVelocity);
+        }
+    }
+}
+ 
+bool IsRotor(IMyTerminalBlock block)
+{
+    var cast = block as IMyMotorStator;
+    return cast != null;
+}
